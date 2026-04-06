@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}대시보드 홈 — Velvet Radio{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+  <div>
+    <h1 style="font-size:1.8rem;color:var(--accent);">📋 승인 대기 목록</h1>
+    <p style="color:var(--text-muted);margin-top:4px;">마스터 검토 후 승인하면 YouTube에 자동 업로드됩니다</p>
+  </div>
+  <div style="color:var(--text-muted);font-size:0.85rem;">
+    총 {{ pending|length }}건 대기 중
+  </div>
+</div>
+
+{% if pending %}
+  {% for item in pending %}
+  <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:20px;">
+    <div style="flex:1;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <span class="badge badge-{{ item.status | replace('_requested','') }}">
+          {{ item.status }}
+        </span>
+        <span style="color:var(--text-muted);font-size:0.8rem;">{{ item.requested_at[:19] | replace('T',' ') }} UTC</span>
+      </div>
+      <h3 style="color:var(--text);margin-bottom:4px;">{{ item.title or item.playlist_id }}</h3>
+      <code style="color:var(--text-muted);font-size:0.8rem;">{{ item.playlist_id }}</code>
+    </div>
+    <div>
+      <a href="/review/{{ item.playlist_id }}" class="btn btn-primary">
+        🔍 검토하기
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card" style="text-align:center;padding:60px;">
+    <div style="font-size:3rem;margin-bottom:16px;">✅</div>
+    <h3 style="color:var(--text-muted);">대기 중인 승인 요청이 없습니다</h3>
+    <p style="color:var(--text-muted);margin-top:8px;font-size:0.9rem;">
+      파이프라인이 실행되면 이곳에 영상 검토 요청이 나타납니다
+    </p>
+  </div>
+{% endif %}
+
+<div class="card" style="margin-top:40px;">
+  <h3 style="color:var(--accent);margin-bottom:16px;">🔄 파이프라인 수동 실행</h3>
+  <p style="color:var(--text-muted);margin-bottom:20px;font-size:0.9rem;">
+    스케줄 외에 즉시 새 플레이리스트 제작을 시작합니다
+  </p>
+  <form method="POST" action="/api/run" onsubmit="return confirm('파이프라인을 지금 시작할까요?')">
+    <button type="submit" class="btn btn-ghost">▶️ 지금 실행</button>
+  </form>
+</div>
+{% endblock %}

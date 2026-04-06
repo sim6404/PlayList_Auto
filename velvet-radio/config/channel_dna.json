@@ -1,0 +1,108 @@
+{
+  "channel": {
+    "name": "Velvet Radio",
+    "handle": "@VelvetRadio",
+    "channel_id": "UC1_f-igasDLBcV3VyxYRfAA",
+    "url": "https://www.youtube.com/@VelvetRadio",
+    "description": "Your daily sanctuary of easy-listening pop, lofi dreams, and warm musical moments. Velvet Radio plays the soundtrack to life's gentle hours.",
+    "target_audience": ["study listeners", "work focus", "relaxation", "sleep", "cafe ambience"],
+    "upload_schedule": {
+      "days": ["tuesday", "friday"],
+      "time_kst": "09:00",
+      "timezone": "Asia/Seoul"
+    }
+  },
+  "music_identity": {
+    "genre_palette": [
+      "acoustic bossa nova pop",
+      "soft jazz pop",
+      "lo-fi dream pop",
+      "warm retro city pop",
+      "mellow folk pop",
+      "ambient indie pop",
+      "neo-soul light",
+      "smooth adult contemporary"
+    ],
+    "bpm_range": { "min": 72, "max": 108 },
+    "key_preference": ["G major", "C major", "D major", "A major", "F major", "Bb major"],
+    "mood_matrix": [
+      "cozy", "nostalgic", "dreamy", "golden-hour",
+      "rainy-day", "sunday-morning", "late-night", "breezy",
+      "tender", "hopeful", "melancholic-soft", "euphoric-gentle"
+    ],
+    "production_tags": [
+      "radio-ready mix",
+      "wide stereo field",
+      "analog warmth",
+      "gentle compression",
+      "warm reverb",
+      "soft saturation"
+    ],
+    "negative_tags": [
+      "no EDM drops",
+      "no heavy metal",
+      "no aggressive beats",
+      "no autotune excess",
+      "no trap hi-hats",
+      "no distortion",
+      "no dubstep",
+      "no screaming",
+      "no harsh noise"
+    ]
+  },
+  "vocal_personas": {
+    "VR_F1": {
+      "description": "warm female, breathy, intimate, subtle vibrato",
+      "character": "Like a late-night radio host whispering secrets",
+      "use_for": ["late-night", "nostalgic", "dreamy"]
+    },
+    "VR_F2": {
+      "description": "bright female, airy, youthful, light falsetto",
+      "character": "Sunshine through a window on a slow morning",
+      "use_for": ["sunday-morning", "breezy", "hopeful"]
+    },
+    "VR_M1": {
+      "description": "smooth male, warm baritone, relaxed delivery",
+      "character": "Jazz club crooner with a velvet voice",
+      "use_for": ["cozy", "golden-hour", "tender"]
+    },
+    "VR_M2": {
+      "description": "soft male, gentle tenor, understated emotion",
+      "character": "Acoustic storyteller by the fireplace",
+      "use_for": ["rainy-day", "melancholic-soft", "nostalgic"]
+    }
+  },
+  "playlist_structure": {
+    "tracks_per_playlist": 20,
+    "hook_tracks": 3,
+    "target_duration_minutes": { "min": 60, "max": 80 },
+    "track_duration_minutes": { "min": 2.5, "max": 4.5 },
+    "flow_pattern": "tension-release arc: gentle open → build → peak (track 8-12) → wind-down → tender close"
+  },
+  "instrument_map": {
+    "acoustic bossa nova pop": ["nylon guitar", "soft percussion", "light piano", "gentle bass"],
+    "soft jazz pop": ["jazz piano", "upright bass", "brushed drums", "muted trumpet"],
+    "lo-fi dream pop": ["lo-fi keys", "ambient pads", "tape-saturated drums", "vinyl crackle"],
+    "warm retro city pop": ["electric piano", "funk guitar", "warm synths", "slap bass"],
+    "mellow folk pop": ["acoustic guitar", "gentle strings", "soft harmonica", "cajon"],
+    "ambient indie pop": ["ambient guitar", "synthesizer pads", "minimal percussion", "piano"],
+    "neo-soul light": ["rhodes piano", "light funk guitar", "soft drums", "backing vocals"],
+    "smooth adult contemporary": ["piano", "strings", "soft guitar", "subtle orchestra"]
+  },
+  "seo": {
+    "primary_keywords": [
+      "easy listening", "chill music", "study music", "relaxing music",
+      "background music", "cafe music", "lofi", "playlist 2026"
+    ],
+    "secondary_keywords": [
+      "velvet radio", "bossa nova", "jazz pop", "soft pop",
+      "work from home music", "focus music", "sleep music", "ambient pop"
+    ],
+    "target_languages": ["en", "ja", "pt-BR", "ko"],
+    "hashtag_groups": {
+      "core": ["#VelvetRadio", "#EasyListening", "#ChillMusic"],
+      "mood": ["#StudyMusic", "#RelaxingMusic", "#CafeMusic"],
+      "genre": ["#BossaNova", "#JazzPop", "#LoFi", "#SoftPop"]
+    }
+  }
+}

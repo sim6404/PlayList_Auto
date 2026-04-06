@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "velvet-radio-dashboard",
+  "builds": [
+    {
+      "src": "dashboard/app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "dashboard/app.py"
+    }
+  ],
+  "env": {
+    "DASHBOARD_SECRET_KEY": "@velvet-dashboard-secret",
+    "MASTER_PASSWORD": "@velvet-master-password",
+    "TELEGRAM_BOT_TOKEN": "@velvet-telegram-bot-token",
+    "TELEGRAM_CHAT_ID": "@velvet-telegram-chat-id",
+    "ANTHROPIC_API_KEY": "@velvet-anthropic-api-key",
+    "SUNO_API_KEY": "@velvet-suno-api-key",
+    "IMAGE_API_KEY": "@velvet-image-api-key",
+    "YOUTUBE_CLIENT_ID": "@velvet-youtube-client-id",
+    "YOUTUBE_CLIENT_SECRET": "@velvet-youtube-client-secret",
+    "YOUTUBE_REFRESH_TOKEN": "@velvet-youtube-refresh-token",
+    "GDRIVE_FOLDER_ID": "@velvet-gdrive-folder-id",
+    "DATA_DIR": "/tmp/data",
+    "LOG_DIR": "/tmp/logs"
+  },
+  "regions": ["icn1"]
+}

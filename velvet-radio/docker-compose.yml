@@ -1,0 +1,103 @@
+version: "3.8"
+
+# ============================================================
+#  Velvet Radio — Docker Compose
+#  서비스: n8n (워크플로) + worker (Python 파이프라인) + dashboard (승인 UI)
+# ============================================================
+
+services:
+
+  # ── n8n 워크플로 자동화 ──────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: velvet-n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/workflows
+      - ./data:/data
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n:5678
+      - GENERIC_TIMEZONE=Asia/Seoul
+      - TZ=Asia/Seoul
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Python 파이프라인 워커 ────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: velvet-worker
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SUNO_API_KEY=${SUNO_API_KEY}
+      - SUNO_API_BASE_URL=${SUNO_API_BASE_URL}
+      - IMAGE_API_KEY=${IMAGE_API_KEY}
+      - IMAGE_API_URL=${IMAGE_API_URL}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET}
+      - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN}
+      - GDRIVE_FOLDER_ID=${GDRIVE_FOLDER_ID}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS}
+      - MASTER_PASSWORD=${MASTER_PASSWORD}
+      - DATA_DIR=/app/data
+      - CONFIG_DIR=/app/config
+      - LOG_DIR=/app/logs
+    depends_on:
+      n8n:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── 마스터 승인 대시보드 ──────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dashboard
+    container_name: velvet-dashboard
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - DASHBOARD_SECRET_KEY=${DASHBOARD_SECRET_KEY}
+      - MASTER_PASSWORD=${MASTER_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - DATA_DIR=/app/data
+      - CONFIG_DIR=/app/config
+    command: ["python", "-m", "dashboard.app"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  n8n_data:
+
+networks:
+  default:
+    name: velvet-network

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"New-Item -ItemType File -Force ''E:\\\\PlayList_Auto\\\\velvet-radio\\\\data\\\\.gitkeep''; New-Item -ItemType File -Force ''E:\\\\PlayList_Auto\\\\velvet-radio\\\\data\\\\playlists\\\\.gitkeep''; New-Item -ItemType File -Force ''E:\\\\PlayList_Auto\\\\velvet-radio\\\\data\\\\lyrics\\\\.gitkeep''; New-Item -ItemType File -Force ''E:\\\\PlayList_Auto\\\\velvet-radio\\\\logs\\\\.gitkeep''; Write-Host done\")"
+    ]
+  }
+}

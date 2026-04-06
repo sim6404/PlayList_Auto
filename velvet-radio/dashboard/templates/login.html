@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}로그인 — Velvet Radio{% endblock %}
+{% block content %}
+<div style="max-width:400px;margin:80px auto;">
+  <div class="card" style="text-align:center;">
+    <div style="font-size:3rem;margin-bottom:16px;">🎙</div>
+    <h1 style="color:var(--accent);margin-bottom:8px;">Velvet Radio</h1>
+    <p style="color:var(--text-muted);margin-bottom:32px;">마스터 승인 대시보드</p>
+    <form method="POST" action="/login">
+      <input
+        type="password" name="password"
+        placeholder="마스터 비밀번호"
+        style="width:100%;padding:12px 16px;background:var(--bg);
+               border:1px solid var(--border);border-radius:8px;
+               color:var(--text);font-size:1rem;margin-bottom:16px;"
+        autofocus required
+      />
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+        로그인
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

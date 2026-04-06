@@ -1,0 +1,163 @@
+"""
+Velvet Radio — Phase 3: FFmpeg 오디오 스펙트럼 렌더링
+배경 이미지 + 음원 → 곡별 시각화 영상 MP4 생성
+"""
+from __future__ import annotations
+
+import subprocess
+import shlex
+from pathlib import Path
+
+from ..common.config_loader import config
+from ..common.logger import get_logger
+
+logger = get_logger(__name__)
+
+VIDEOS_DIR = config.data_dir / "videos"
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── FFmpeg 필터 프리셋 ───────────────────────────────────────────
+
+SPECTRUM_FILTERS = {
+    "wave": (
+        "[1:a]showwaves=s=1920x200:mode=cline:rate=30:"
+        "colors=0xFFFFFF@0.7:scale=sqrt,format=rgba[wave];"
+        "[bg][wave]overlay=0:H-220:shortest=1[vout]"
+    ),
+    "freq": (
+        "[1:a]showfreqs=s=1920x200:mode=bar:ascale=log:"
+        "colors=0xE8D5B7@0.8,format=rgba[freq];"
+        "[bg][freq]overlay=0:H-220:shortest=1[vout]"
+    ),
+    "vector": (
+        "[1:a]avectorscope=s=400x400:zoom=1.5:draw=line:"
+        "bc=0x000000:fc=0xFFFFFF@0.6,format=rgba[scope];"
+        "[bg][scope]overlay=W-420:H-420:shortest=1[vout]"
+    ),
+}
+
+
+def _build_ffmpeg_cmd(
+    background_image: Path,
+    audio_file: Path,
+    output_path: Path,
+    subtitle_file: Path | None = None,
+    filter_type: str = "wave",
+) -> list[str]:
+    """FFmpeg 명령어 리스트 조립"""
+    inputs = [
+        "ffmpeg", "-y",
+        "-loop", "1", "-i", str(background_image),   # 0: background
+        "-i", str(audio_file),                         # 1: audio
+    ]
+
+    spectrum_filter = SPECTRUM_FILTERS.get(filter_type, SPECTRUM_FILTERS["wave"])
+
+    if subtitle_file and subtitle_file.exists():
+        # 자막 포함
+        filter_complex = (
+            f"[0:v]scale=1920:1080,setsar=1[bg];"
+            f"{spectrum_filter};"
+            f"[vout]subtitles='{str(subtitle_file).replace(chr(92), '/')}'"
+            f":force_style='FontName=Arial,FontSize=20,"
+            f"PrimaryColour=&HFFFFFF,OutlineColour=&H000000,"
+            f"Outline=1,Shadow=0,Alignment=2,MarginV=40'[final]"
+        )
+        map_out = "[final]"
+    else:
+        filter_complex = (
+            f"[0:v]scale=1920:1080,setsar=1[bg];"
+            f"{spectrum_filter}"
+        )
+        map_out = "[vout]"
+
+    cmd = inputs + [
+        "-filter_complex", filter_complex,
+        "-map", map_out,
+        "-map", "1:a",
+        "-c:v", "libx264",
+        "-preset", "medium",
+        "-crf", "20",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "44100",
+        "-shortest",
+        str(output_path),
+    ]
+    return cmd
+
+
+def render_track_video(
+    background_image: Path,
+    audio_file: Path,
+    output_path: Path,
+    subtitle_file: Path | None = None,
+    filter_type: str = "wave",
+) -> Path:
+    """
+    단일 트랙 영상 렌더링
+
+    Returns:
+        렌더링된 MP4 경로
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = _build_ffmpeg_cmd(background_image, audio_file, output_path, subtitle_file, filter_type)
+
+    logger.info(
+        "FFmpeg 렌더링 시작",
+        audio=audio_file.name,
+        filter=filter_type,
+        output=output_path.name,
+    )
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    if result.returncode != 0:
+        logger.error("FFmpeg 실패", stderr=result.stderr[-500:], cmd=" ".join(cmd[:6]))
+        raise RuntimeError(f"FFmpeg 렌더링 실패: {result.stderr[-200:]}")
+
+    size_mb = output_path.stat().st_size / 1_048_576
+    logger.info("FFmpeg 렌더링 완료", output=output_path.name, size_mb=f"{size_mb:.1f}MB")
+    return output_path
+
+
+def render_playlist_videos(
+    playlist_id: str,
+    track_assets: list[dict],  # [{order, title, audio_path, background_path, subtitle_path}]
+    filter_type: str = "wave",
+) -> list[dict]:
+    """
+    플레이리스트 전체 곡별 영상 렌더링
+
+    Returns:
+        [{order, title, video_path, success}]
+    """
+    out_dir = VIDEOS_DIR / playlist_id / "tracks"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    results = []
+    for asset in sorted(track_assets, key=lambda x: x["order"]):
+        order = asset["order"]
+        out_path = out_dir / f"track_{order:02d}.mp4"
+        try:
+            render_track_video(
+                background_image=Path(asset["background_path"]),
+                audio_file=Path(asset["audio_path"]),
+                output_path=out_path,
+                subtitle_file=Path(asset["subtitle_path"]) if asset.get("subtitle_path") else None,
+                filter_type=filter_type,
+            )
+            results.append({"order": order, "title": asset["title"], "video_path": str(out_path), "success": True})
+        except Exception as e:
+            logger.error("트랙 렌더링 실패", order=order, error=str(e))
+            results.append({"order": order, "title": asset["title"], "video_path": None, "success": False})
+
+    success = sum(1 for r in results if r["success"])
+    logger.info("플레이리스트 렌더링 완료", playlist_id=playlist_id, success=success, total=len(results))
+    return results

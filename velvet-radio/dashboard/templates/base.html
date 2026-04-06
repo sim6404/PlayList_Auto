@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Velvet Radio — 승인 대시보드{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #0d0b12;
+      --surface: #1a1625;
+      --border: #2e2640;
+      --accent: #c9a96e;
+      --accent2: #9b6fd4;
+      --text: #e8dff0;
+      --text-muted: #8b7fa0;
+      --success: #4caf82;
+      --danger: #e05c5c;
+      --warning: #e0a84a;
+      --info: #5c9fe0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+    header .logo span { color: var(--text-muted); font-weight: 400; font-size: 0.9rem; }
+    header nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 24px;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    header nav a:hover { color: var(--text); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px; }
+    .flash { padding: 12px 20px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
+    .flash.success { background: #1a3d2e; border: 1px solid var(--success); color: var(--success); }
+    .flash.error { background: #3d1a1a; border: 1px solid var(--danger); color: var(--danger); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 8px; border: none;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      text-decoration: none; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: #1a1208; }
+    .btn-primary:hover { background: #e0be80; }
+    .btn-success { background: var(--success); color: #0a2018; }
+    .btn-success:hover { background: #5dcc9a; }
+    .btn-danger { background: var(--danger); color: #1a0808; }
+    .btn-danger:hover { background: #f07070; }
+    .btn-warning { background: var(--warning); color: #1a1008; }
+    .btn-ghost {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--surface); color: var(--text); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;
+    }
+    .badge-pending { background: #3d2e1a; color: var(--warning); }
+    .badge-approved { background: #1a3d2e; color: var(--success); }
+    .badge-rejected { background: #3d1a1a; color: var(--danger); }
+    .badge-revision { background: #1a253d; color: var(--info); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <div class="logo">🎙 Velvet Radio <span>승인 대시보드</span></div>
+    <nav>
+      <a href="{{ url_for('index') }}">홈</a>
+      <a href="{{ url_for('logout') }}">로그아웃</a>
+    </nav>
+  </header>
+  <div class="container">
+    {% for msg, cat in get_flashed_messages(with_categories=True) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

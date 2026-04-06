@@ -1,0 +1,75 @@
+{
+  "name": "W0 — Velvet Radio Master Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {"field": "cronExpression", "expression": "0 9 * * 2,5"}
+          ]
+        }
+      },
+      "name": "Cron: 화/금 9AM KST",
+      "type": "n8n-nodes-base.cron",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://worker:8000/pipeline/run",
+        "method": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "{\"auto_schedule\": true}",
+        "options": {"timeout": 9000000}
+      },
+      "name": "파이프라인 실행",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "🚀 Velvet Radio 파이프라인 시작!\n━━━━━━━━━━━━━━━━━\n⏰ {{$now.format('YYYY-MM-DD HH:mm')}} KST",
+        "additionalFields": {"parse_mode": "HTML"}
+      },
+      "name": "Telegram: 시작 알림",
+      "type": "n8n-nodes-base.telegram",
+      "position": [460, 180],
+      "credentials": {"telegramApi": {"id": "1", "name": "Telegram Bot"}}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{"value1": "={{$json.success}}", "value2": true}]
+        }
+      },
+      "name": "성공 여부 확인",
+      "type": "n8n-nodes-base.if",
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "🚨 [Velvet Radio] 파이프라인 실패!\n오류: {{$json.error}}\n수동 확인이 필요합니다.",
+        "additionalFields": {"parse_mode": "HTML"}
+      },
+      "name": "Telegram: 오류 알림",
+      "type": "n8n-nodes-base.telegram",
+      "position": [940, 420],
+      "credentials": {"telegramApi": {"id": "1", "name": "Telegram Bot"}}
+    }
+  ],
+  "connections": {
+    "Cron: 화/금 9AM KST": {
+      "main": [[{"node": "Telegram: 시작 알림", "type": "main", "index": 0},
+                {"node": "파이프라인 실행", "type": "main", "index": 0}]]
+    },
+    "파이프라인 실행": {
+      "main": [[{"node": "성공 여부 확인", "type": "main", "index": 0}]]
+    },
+    "성공 여부 확인": {
+      "main": [[], [{"node": "Telegram: 오류 알림", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": ["velvet-radio", "master"]
+}
