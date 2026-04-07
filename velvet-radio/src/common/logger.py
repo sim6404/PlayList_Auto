@@ -8,10 +8,12 @@ import logging
 import sys
 from pathlib import Path
 
+import os
+
 import structlog
 
 
-LOG_DIR = Path(__file__).parent.parent.parent / "logs"
+LOG_DIR = Path(os.environ.get("LOG_DIR", str(Path(__file__).parent.parent.parent / "logs")))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 

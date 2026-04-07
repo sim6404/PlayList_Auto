@@ -23,31 +23,31 @@ class AppConfig(BaseSettings):
     """환경변수 기반 설정 (Pydantic BaseSettings)"""
 
     # Claude
-    anthropic_api_key: str = Field(..., alias="ANTHROPIC_API_KEY")
+    anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
     claude_model: str = Field("claude-sonnet-4-20250514", alias="CLAUDE_MODEL")
 
     # Suno
-    suno_api_key: str = Field(..., alias="SUNO_API_KEY")
+    suno_api_key: str = Field("", alias="SUNO_API_KEY")
     suno_api_base_url: str = Field("https://api.sunoapi.org/v1", alias="SUNO_API_BASE_URL")
     suno_model: str = Field("v5", alias="SUNO_MODEL")
 
     # Image
-    image_api_key: str = Field(..., alias="IMAGE_API_KEY")
+    image_api_key: str = Field("", alias="IMAGE_API_KEY")
     image_api_url: str = Field("https://api.apiframe.ai/v1", alias="IMAGE_API_URL")
 
     # YouTube
-    youtube_client_id: str = Field(..., alias="YOUTUBE_CLIENT_ID")
-    youtube_client_secret: str = Field(..., alias="YOUTUBE_CLIENT_SECRET")
-    youtube_refresh_token: str = Field(..., alias="YOUTUBE_REFRESH_TOKEN")
+    youtube_client_id: str = Field("", alias="YOUTUBE_CLIENT_ID")
+    youtube_client_secret: str = Field("", alias="YOUTUBE_CLIENT_SECRET")
+    youtube_refresh_token: str = Field("", alias="YOUTUBE_REFRESH_TOKEN")
     youtube_channel_id: str = Field("UC1_f-igasDLBcV3VyxYRfAA", alias="YOUTUBE_CHANNEL_ID")
 
     # Google Drive
-    gdrive_folder_id: str = Field(..., alias="GDRIVE_FOLDER_ID")
+    gdrive_folder_id: str = Field("", alias="GDRIVE_FOLDER_ID")
     gdrive_credentials_path: str = Field("./config/gdrive_credentials.json", alias="GDRIVE_CREDENTIALS_PATH")
 
     # Telegram
-    telegram_bot_token: str = Field(..., alias="TELEGRAM_BOT_TOKEN")
-    telegram_chat_id: str = Field(..., alias="TELEGRAM_CHAT_ID")
+    telegram_bot_token: str = Field("", alias="TELEGRAM_BOT_TOKEN")
+    telegram_chat_id: str = Field("", alias="TELEGRAM_CHAT_ID")
     telegram_admin_ids: str = Field("", alias="TELEGRAM_ADMIN_IDS")
 
     # n8n
@@ -57,7 +57,7 @@ class AppConfig(BaseSettings):
     # Dashboard
     dashboard_secret_key: str = Field("changeme-secret", alias="DASHBOARD_SECRET_KEY")
     dashboard_port: int = Field(8080, alias="DASHBOARD_PORT")
-    master_password: str = Field(..., alias="MASTER_PASSWORD")
+    master_password: str = Field("velvet2024", alias="MASTER_PASSWORD")
 
     # Paths
     data_dir: Path = Field(ROOT / "data", alias="DATA_DIR")
