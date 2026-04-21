@@ -4,7 +4,9 @@ Claude API → Suno 메타태그 포함 가사 → data/lyrics/ 저장
 """
 from __future__ import annotations
 
+import asyncio
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..common.claude_client import get_claude_client
@@ -80,9 +82,12 @@ def generate_lyrics_for_track(track: Track) -> Lyrics:
     )
 
 
-def generate_all_lyrics(playlist: Playlist) -> list[Lyrics]:
+async def generate_all_lyrics(playlist: Playlist, max_concurrent: int = 5) -> list[Lyrics]:
     """
-    플레이리스트 전체 20곡 가사 생성
+    플레이리스트 전체 20곡 가사 병렬 생성 (순차 → 동시 실행으로 개선)
+
+    ThreadPoolExecutor로 동기 Claude API 호출을 병렬화하여
+    20곡 × ~9s → 약 40~50s (기존 ~180s 대비 ~4배 속도)
 
     Returns:
         list[Lyrics]: 생성된 가사 목록 (data/lyrics/{playlist_id}/ 에 저장)
@@ -90,29 +95,29 @@ def generate_all_lyrics(playlist: Playlist) -> list[Lyrics]:
     out_dir = LYRICS_DIR / playlist.id
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    all_lyrics: list[Lyrics] = []
-    failed: list[int] = []
+    logger.info("가사 생성 시작 (병렬)", playlist_id=playlist.id, total=len(playlist.tracks), concurrency=max_concurrent)
 
-    logger.info("가사 생성 시작", playlist_id=playlist.id, total=len(playlist.tracks))
+    semaphore = asyncio.Semaphore(max_concurrent)
+    loop = asyncio.get_event_loop()
+    executor = ThreadPoolExecutor(max_workers=max_concurrent)
 
-    for track in playlist.tracks:
-        try:
-            lyrics = generate_lyrics_for_track(track)
-            all_lyrics.append(lyrics)
+    async def _gen_one(track: Track) -> tuple[Lyrics | None, int]:
+        async with semaphore:
+            try:
+                lyrics = await loop.run_in_executor(executor, generate_lyrics_for_track, track)
+                out_path = out_dir / f"track_{track.order:02d}.txt"
+                out_path.write_text(lyrics.content, encoding="utf-8")
+                logger.info("가사 생성 완료", order=track.order, title=track.title, chars=lyrics.char_count)
+                return lyrics, track.order
+            except Exception as e:
+                logger.error("가사 생성 실패", order=track.order, title=track.title, error=str(e))
+                return None, track.order
 
-            # 저장
-            out_path = out_dir / f"track_{track.order:02d}.txt"
-            out_path.write_text(lyrics.content, encoding="utf-8")
+    results = await asyncio.gather(*[_gen_one(t) for t in playlist.tracks])
+    executor.shutdown(wait=False)
 
-            logger.info(
-                "가사 생성 완료",
-                order=track.order,
-                title=track.title,
-                chars=lyrics.char_count,
-            )
-        except Exception as e:
-            logger.error("가사 생성 실패", order=track.order, title=track.title, error=str(e))
-            failed.append(track.order)
+    all_lyrics = [lyr for lyr, _ in results if lyr is not None]
+    failed = [order for lyr, order in results if lyr is None]
 
     logger.info(
         "전체 가사 생성 완료",

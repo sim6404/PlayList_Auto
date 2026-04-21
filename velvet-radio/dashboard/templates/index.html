@@ -1,6 +1,53 @@
 {% extends "base.html" %}
 {% block title %}대시보드 홈 — Velvet Radio{% endblock %}
+
+{% block head %}
+<style>
+  .run-status-box {
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .run-status-box.success { background: #0f2b1f; border: 1px solid var(--success); color: var(--success); }
+  .run-status-box.error   { background: #2b0f0f; border: 1px solid var(--danger);  color: var(--danger); }
+  .run-status-box.info    { background: #1a1a2e; border: 1px solid var(--info);    color: var(--info); }
+
+  .phase-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+  }
+  .phase-pill {
+    padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+  }
+  .phase-pill.completed { background: #1a3d2e; border-color: var(--success); color: var(--success); }
+  .phase-pill.running   { background: #3d2e00; border-color: var(--warning); color: var(--warning); animation: pulse 1.5s infinite; }
+  .phase-pill.failed    { background: #3d1a1a; border-color: var(--danger);  color: var(--danger); }
+  .phase-pill.skipped   { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+
+  #run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  code.cmd {
+    display: inline-block;
+    background: #0d0b12;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    color: var(--accent);
+    margin-top: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+
+<!-- 승인 대기 목록 -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
   <div>
     <h1 style="font-size:1.8rem;color:var(--accent);">📋 승인 대기 목록</h1>
@@ -41,13 +88,193 @@
   </div>
 {% endif %}
 
+<!-- 파이프라인 수동 실행 -->
 <div class="card" style="margin-top:40px;">
-  <h3 style="color:var(--accent);margin-bottom:16px;">🔄 파이프라인 수동 실행</h3>
-  <p style="color:var(--text-muted);margin-bottom:20px;font-size:0.9rem;">
-    스케줄 외에 즉시 새 플레이리스트 제작을 시작합니다
+
+  <!-- 헤더 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <h3 style="color:var(--accent);">🔄 파이프라인 수동 실행</h3>
+    <div id="pipeline-status-badge"></div>
+  </div>
+  <p style="color:var(--text-muted);margin-bottom:20px;font-size:0.88rem;">
+    스케줄 외에 즉시 새 플레이리스트 제작을 시작합니다.<br>
+    로컬 워커가 실행 중이어야 자동으로 시작됩니다.
   </p>
-  <form method="POST" action="/api/run" onsubmit="return confirm('파이프라인을 지금 시작할까요?')">
-    <button type="submit" class="btn btn-ghost">▶️ 지금 실행</button>
-  </form>
+
+  <!-- 현재 실행 상태 박스 -->
+  <div id="status-box" style="display:none;margin-bottom:18px;padding:16px;background:var(--bg);border-radius:10px;border:1px solid var(--border);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span id="status-icon" style="font-size:1.2rem;">⏳</span>
+      <span id="status-text" style="font-size:0.9rem;font-weight:600;"></span>
+    </div>
+    <div id="status-meta" style="font-size:0.8rem;color:var(--text-muted);line-height:1.8;"></div>
+    <div id="phase-bar" class="phase-bar"></div>
+  </div>
+
+  <!-- 요청 결과 박스 -->
+  <div id="run-result-box" class="run-status-box"></div>
+
+  <!-- 버튼 행 -->
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <button id="run-btn" class="btn btn-ghost" onclick="runPipeline()">▶️ 지금 실행</button>
+    <a href="/pipeline-studio" style="padding:8px 16px;border-radius:8px;font-size:0.85rem;font-weight:600;background:linear-gradient(135deg,#a855f7,#6366f1);color:#fff;text-decoration:none;border:none;cursor:pointer;transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">🎛️ Pipeline Studio</a>
+    <button class="btn btn-ghost" style="font-size:0.82rem;" onclick="refreshStatus(true)">🔄 상태 새로고침</button>
+  </div>
+
+  <!-- 워커 실행 안내 -->
+  <div style="margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;">💡 <b>로컬 워커 실행 방법</b></p>
+    <code class="cmd">cd velvet-radio &amp;&amp; python worker.py --watch</code>
+    <span style="color:var(--text-muted);font-size:0.78rem;display:block;margin-top:6px;">
+      또는 즉시 실행: <code style="font-size:0.78rem;">python worker.py --run-now</code>
+      &nbsp;|&nbsp; 상태 확인: <code style="font-size:0.78rem;">python worker.py --status</code>
+      &nbsp;|&nbsp; Telegram: <code style="font-size:0.78rem;">/run</code>을 봇에게 전송
+    </span>
+  </div>
 </div>
+
+<script>
+// ── 상태 관리 ───────────────────────────────────────────────────────
+let pollInterval = null;
+const STATUS_ICONS  = { idle:'😴', running:'⏳', completed:'✅', failed:'❌' };
+const STATUS_LABELS = { idle:'대기 중', running:'실행 중...', completed:'완료', failed:'실패' };
+const BADGE_COLORS  = {
+  idle:      { bg:'rgba(139,127,160,0.15)', color:'var(--text-muted)', border:'rgba(139,127,160,0.3)' },
+  running:   { bg:'rgba(224,168,74,0.15)',  color:'var(--warning)',    border:'rgba(224,168,74,0.3)' },
+  completed: { bg:'rgba(76,175,130,0.15)',  color:'var(--success)',    border:'rgba(76,175,130,0.3)' },
+  failed:    { bg:'rgba(224,92,92,0.15)',   color:'var(--danger)',     border:'rgba(224,92,92,0.3)' },
+};
+
+function updateStatusUI(data) {
+  const s = data.status || 'idle';
+  const c = BADGE_COLORS[s] || BADGE_COLORS.idle;
+
+  // 상태 배지
+  document.getElementById('pipeline-status-badge').innerHTML =
+    `<span style="padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;
+      background:${c.bg};color:${c.color};border:1px solid ${c.border};">
+      ${STATUS_ICONS[s]||'?'} ${STATUS_LABELS[s]||s}
+    </span>`;
+
+  // 상태 상세 박스
+  const box = document.getElementById('status-box');
+  if (s === 'idle') {
+    box.style.display = 'none';
+    stopPolling();
+    return;
+  }
+
+  box.style.display = 'block';
+  document.getElementById('status-icon').textContent = STATUS_ICONS[s] || '?';
+  document.getElementById('status-text').textContent = STATUS_LABELS[s] || s;
+
+  let meta = '';
+  if (data.run_id)      meta += `🆔 Run ID: <code>${data.run_id}</code><br>`;
+  if (data.started_at)  meta += `▶️ 시작: ${data.started_at.slice(0,19).replace('T',' ')} UTC<br>`;
+  if (data.updated_at)  meta += `🕐 업데이트: ${data.updated_at.slice(0,19).replace('T',' ')} UTC<br>`;
+  if (data.youtube_url) meta += `🔗 <a href="${data.youtube_url}" target="_blank" style="color:var(--accent);">${data.youtube_url}</a><br>`;
+  if (data.error)       meta += `<span style="color:var(--danger);">❌ ${data.error.slice(0,300)}</span><br>`;
+  document.getElementById('status-meta').innerHTML = meta;
+
+  // Phase 바
+  const phaseBar = document.getElementById('phase-bar');
+  if (data.phases && data.phases.length > 0) {
+    phaseBar.innerHTML = data.phases.map(p =>
+      `<span class="phase-pill ${p.status}" title="${p.phase}: ${p.duration || 0}s">
+        ${p.phase.replace('phase','P')} ${p.status==='completed'?'✓':p.status==='failed'?'✗':p.status==='running'?'…':''}
+      </span>`
+    ).join('');
+  } else {
+    phaseBar.innerHTML = '';
+  }
+
+  // 실행 중일 때 폴링 시작, 완료/실패 시 중지
+  if (s === 'running') startPolling();
+  else stopPolling();
+}
+
+// ── 상태 API 호출 ─────────────────────────────────────────────────
+async function refreshStatus(showFeedback = false) {
+  try {
+    const resp = await fetch('/api/pipeline/status');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    updateStatusUI(data);
+    if (showFeedback) showResult('상태를 새로고침했습니다.', 'info', 2000);
+  } catch (e) {}
+}
+
+// ── 실행 버튼 ─────────────────────────────────────────────────────
+async function runPipeline() {
+  const btn = document.getElementById('run-btn');
+
+  if (!confirm('파이프라인을 지금 시작할까요?\n\n로컬 워커(python worker.py --watch)가 실행 중이어야 자동으로 시작됩니다.')) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 요청 중...';
+  clearResult();
+
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json();
+
+    if (resp.status === 409) {
+      // 이미 실행 중
+      showResult(
+        `⚠️ 파이프라인이 이미 실행 중입니다. (Run ID: <code>${data.run_id||''}</code>)`,
+        'info'
+      );
+      refreshStatus();
+    } else if (data.status === 'triggered') {
+      showResult(
+        `✅ 실행 요청 접수됨 — Run ID: <code>${data.run_id}</code><br>
+        <span style="color:var(--text-muted);font-size:0.82rem;">
+          Telegram 알림을 확인하세요.<br>
+          워커가 없다면: <code>python worker.py --run-now</code>
+        </span>`,
+        'success'
+      );
+      setTimeout(refreshStatus, 3000);
+      startPolling();
+    } else {
+      showResult(`❌ ${data.message || '오류가 발생했습니다.'}`, 'error');
+    }
+  } catch (e) {
+    showResult(`❌ 요청 실패: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶️ 지금 실행';
+  }
+}
+
+// ── 결과 박스 ─────────────────────────────────────────────────────
+function showResult(html, type, autoHideMs = 0) {
+  const box = document.getElementById('run-result-box');
+  box.innerHTML = html;
+  box.className = `run-status-box ${type}`;
+  box.style.display = 'block';
+  if (autoHideMs > 0) setTimeout(() => { box.style.display = 'none'; }, autoHideMs);
+}
+function clearResult() {
+  const box = document.getElementById('run-result-box');
+  box.style.display = 'none';
+  box.innerHTML = '';
+}
+
+// ── 폴링 ──────────────────────────────────────────────────────────
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(refreshStatus, 10000);
+}
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+// ── 초기화 ────────────────────────────────────────────────────────
+refreshStatus();
+</script>
 {% endblock %}

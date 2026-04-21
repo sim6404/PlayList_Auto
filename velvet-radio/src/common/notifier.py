@@ -5,6 +5,7 @@ Velvet Radio — 알림 모듈 (Telegram)
 from __future__ import annotations
 
 import asyncio
+import html
 from typing import Optional
 
 import httpx
@@ -87,8 +88,8 @@ class TelegramNotifier:
         msg = (
             "🎬 <b>[Velvet Radio] 파이프라인 시작</b>\n"
             "━━━━━━━━━━━━━━━━━\n"
-            f"📎 <b>테마:</b> {theme}\n"
-            f"🆔 <b>ID:</b> <code>{playlist_id}</code>\n"
+            f"📎 <b>테마:</b> {html.escape(theme)}\n"
+            f"🆔 <b>ID:</b> <code>{html.escape(playlist_id)}</code>\n"
             "⏳ Phase 1 (컨셉 기획) 진행 중..."
         )
         self._send(msg)
@@ -104,11 +105,12 @@ class TelegramNotifier:
         self._send(msg)
 
     def notify_error(self, phase: str, error: str, track_info: Optional[str] = None) -> None:
-        detail = f"\n📍 <b>트랙:</b> {track_info}" if track_info else ""
+        safe_error = html.escape(str(error))[:500]
+        detail = f"\n📍 <b>트랙:</b> {html.escape(str(track_info))}" if track_info else ""
         msg = (
             f"🚨 <b>[Velvet Radio] {phase.upper()} 에러</b>\n"
             "━━━━━━━━━━━━━━━━━\n"
-            f"❌ {error}{detail}\n"
+            f"❌ {safe_error}{detail}\n"
             "🔄 재시도 중 또는 건너뜀..."
         )
         self._send(msg)
@@ -179,8 +181,8 @@ class TelegramNotifier:
         msg = (
             "🗑 <b>[Velvet Radio] 업로드 취소</b>\n"
             "━━━━━━━━━━━━━━━━━\n"
-            f"🆔 {playlist_id}\n"
-            f"📝 사유: {reason}"
+            f"🆔 {html.escape(playlist_id)}\n"
+            f"📝 사유: {html.escape(str(reason))}"
         )
         self._send(msg)
 

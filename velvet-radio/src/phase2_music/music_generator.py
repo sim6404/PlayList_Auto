@@ -31,7 +31,7 @@ def _load_lyrics_map(playlist: Playlist) -> dict[int, str]:
     return lyrics_map
 
 
-async def run_music_generation(playlist: Playlist) -> QualityReport:
+async def run_music_generation(playlist: Playlist, progress_cb=None) -> QualityReport:
     """
     Phase 2 메인 진입점
 
@@ -70,6 +70,7 @@ async def run_music_generation(playlist: Playlist) -> QualityReport:
             playlist_id=playlist.id,
             variants=2,
             concurrency=config.max_concurrent_suno_jobs,
+            progress_cb=progress_cb,
         )
     except Exception as e:
         logger.error("Suno 배치 생성 실패", error=str(e))

@@ -88,6 +88,34 @@ def _build_ffmpeg_cmd(
     return cmd
 
 
+def _run_ffmpeg(cmd: list[str], label: str) -> None:
+    """
+    FFmpeg 명령 실행 (bytes 모드) — Windows cp949 인코딩 충돌 방지.
+
+    Raises:
+        RuntimeError: returncode != 0
+    """
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=False,   # bytes 모드 — Windows 인코딩 문제 방지
+        timeout=300,
+    )
+    stderr_text = (result.stderr or b"").decode("utf-8", errors="replace")
+    if result.returncode != 0:
+        logger.error(
+            "FFmpeg 실패",
+            label=label,
+            returncode=result.returncode,
+            stderr_tail=stderr_text[-600:],
+            cmd_head=" ".join(cmd[:8]),
+        )
+        raise RuntimeError(
+            f"FFmpeg 렌더링 실패 [{label}] (rc={result.returncode}): {stderr_text[-300:]}"
+        )
+    logger.debug("FFmpeg 성공", label=label, returncode=result.returncode)
+
+
 def render_track_video(
     background_image: Path,
     audio_file: Path,
@@ -96,31 +124,40 @@ def render_track_video(
     filter_type: str = "wave",
 ) -> Path:
     """
-    단일 트랙 영상 렌더링
+    단일 트랙 영상 렌더링.
+    자막 포함 렌더링이 실패하면 자막 없이 재시도하는 폴백 로직 포함.
 
     Returns:
         렌더링된 MP4 경로
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    cmd = _build_ffmpeg_cmd(background_image, audio_file, output_path, subtitle_file, filter_type)
 
     logger.info(
         "FFmpeg 렌더링 시작",
         audio=audio_file.name,
         filter=filter_type,
         output=output_path.name,
+        has_subtitle=subtitle_file is not None and (subtitle_file.exists() if subtitle_file else False),
     )
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
+    # 1차 시도: 자막 포함 (subtitle_file이 있는 경우)
+    cmd = _build_ffmpeg_cmd(background_image, audio_file, output_path, subtitle_file, filter_type)
+    try:
+        _run_ffmpeg(cmd, label=f"{audio_file.name}+subtitle")
+    except RuntimeError as first_err:
+        # 자막이 없었거나 자막 없이 이미 시도한 경우 — 바로 re-raise
+        effective_subtitle = subtitle_file if (subtitle_file and subtitle_file.exists()) else None
+        if effective_subtitle is None:
+            raise
 
-    if result.returncode != 0:
-        logger.error("FFmpeg 실패", stderr=result.stderr[-500:], cmd=" ".join(cmd[:6]))
-        raise RuntimeError(f"FFmpeg 렌더링 실패: {result.stderr[-200:]}")
+        # 2차 시도: 자막 필터 제거 후 재시도
+        logger.warning(
+            "자막 포함 렌더링 실패 — 자막 없이 재시도",
+            audio=audio_file.name,
+            first_error=str(first_err)[:200],
+        )
+        cmd_no_sub = _build_ffmpeg_cmd(background_image, audio_file, output_path, None, filter_type)
+        _run_ffmpeg(cmd_no_sub, label=f"{audio_file.name}+no_subtitle_fallback")
 
     size_mb = output_path.stat().st_size / 1_048_576
     logger.info("FFmpeg 렌더링 완료", output=output_path.name, size_mb=f"{size_mb:.1f}MB")
