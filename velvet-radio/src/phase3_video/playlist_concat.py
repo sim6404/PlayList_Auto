@@ -121,10 +121,11 @@ def concat_playlist_videos(
     out_dir.mkdir(parents=True, exist_ok=True)
     final_path = out_dir / f"{playlist.id}_final.mp4"
 
-    # 1. filelist.txt 작성
+    # 1. filelist.txt 작성 — 절대경로 사용 (상대경로는 %TEMP% 기준으로 잘못 해석됨)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
         for v in sorted(valid_videos, key=lambda x: x["order"]):
-            f.write(f"file '{v['video_path']}'\n")
+            abs_path = str(Path(v["video_path"]).resolve()).replace("\\", "/")
+            f.write(f"file '{abs_path}'\n")
         filelist_path = f.name
 
     # 2. FFmpeg concat

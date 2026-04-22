@@ -98,7 +98,7 @@ async def generate_all_lyrics(playlist: Playlist, max_concurrent: int = 5) -> li
     logger.info("가사 생성 시작 (병렬)", playlist_id=playlist.id, total=len(playlist.tracks), concurrency=max_concurrent)
 
     semaphore = asyncio.Semaphore(max_concurrent)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()   # get_event_loop() → 실행 중 루프와 불일치 버그 수정
     executor = ThreadPoolExecutor(max_workers=max_concurrent)
 
     async def _gen_one(track: Track) -> tuple[Lyrics | None, int]:
