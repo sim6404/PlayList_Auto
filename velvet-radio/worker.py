@@ -19,6 +19,14 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# ── Windows 콘솔 UTF-8 강제 설정 (cp949 인코딩 오류 방지) ──────────
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ── 경로 설정 ──────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
@@ -401,7 +409,47 @@ async def execute_phase(phase_num: int, session_id: str, trigger_data: dict,
 
 # ── 감시 루프 ──────────────────────────────────────────────────────
 
-def watch_loop(interval: int = 60) -> None:
+def _start_dashboard_server(port: int = 8080) -> bool:
+    """
+    Flask 대시보드를 백그라운드 스레드로 기동.
+    Returns True if server started successfully.
+    """
+    import threading
+
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(ROOT))
+
+        # app.py (독립형 진입점) 임포트
+        from app import app as flask_app
+
+        def _run():
+            flask_app.run(
+                host="0.0.0.0",
+                port=port,
+                debug=False,
+                use_reloader=False,   # 워커 루프와 충돌 방지
+            )
+
+        t = threading.Thread(target=_run, daemon=True, name="dashboard-server")
+        t.start()
+        # 서버 기동 확인 (최대 3초 대기)
+        for _ in range(6):
+            time.sleep(0.5)
+            try:
+                with httpx.Client(timeout=1) as c:
+                    r = c.get(f"http://127.0.0.1:{port}/health")
+                    if r.status_code == 200:
+                        return True
+            except Exception:
+                pass
+        return True  # 기동 실패해도 계속 진행
+    except Exception as e:
+        print(f"[Worker] [!] 대시보드 서버 기동 실패: {e}")
+        return False
+
+
+def watch_loop(interval: int = 60, dashboard_port: int = 8080, no_dashboard: bool = False) -> None:
     """
     감시 모드 — 두 가지 트리거 방식:
     1. data/run_queue/trigger_*.json 파일 감지
@@ -412,11 +460,21 @@ def watch_loop(interval: int = 60) -> None:
 
     tg = TelegramPoller(bot_token, chat_id) if (bot_token and chat_id) else None
 
+    # ── 대시보드 서버 내장 기동 ─────────────────────────────────────
+    dashboard_ok = False
+    if not no_dashboard:
+        print(f"[Worker] [~] 대시보드 서버 기동 중... (port {dashboard_port})")
+        dashboard_ok = _start_dashboard_server(dashboard_port)
+
     print(f"\n{'='*50}")
     print(f"[Worker] [*]  감시 모드 시작")
     print(f"[Worker]    감시 간격 : {interval}초")
     print(f"[Worker]    트리거 폴더: {RUN_QUEUE_DIR}")
     print(f"[Worker]    Telegram : {'활성' if tg else '비활성 (TOKEN/CHAT_ID 없음)'}")
+    if not no_dashboard:
+        status_icon = "[OK]" if dashboard_ok else "[!]"
+        print(f"[Worker]    대시보드  : {status_icon} http://localhost:{dashboard_port}")
+        print(f"[Worker]    Studio   : http://localhost:{dashboard_port}/pipeline-studio")
     if tg:
         print(f"[Worker]    → 봇에게 /run 을 보내면 파이프라인이 시작됩니다")
     print(f"[Worker]    Ctrl+C 로 종료")
@@ -485,9 +543,10 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예시:
-  python worker.py --run-now                           즉시 파이프라인 실행
-  python worker.py --watch                             감시 모드 (60초 간격)
-  python worker.py --watch --interval 30               감시 모드 (30초 간격)
+  python worker.py --watch                             감시 모드 + 대시보드 자동 기동
+  python worker.py --watch --no-dashboard              감시 모드만 (대시보드 없이)
+  python worker.py --watch --dashboard-port 9090       다른 포트로 대시보드 기동
+  python worker.py --run-now                           즉시 파이프라인 실행 (대시보드 없음)
   python worker.py --status                            현재 상태 확인
   python worker.py --phase 3 --session 20260421_120000 Phase 3만 단독 실행
   python worker.py --resume 20260421_120000            마지막 성공 Phase 이후부터 재실행
@@ -495,8 +554,12 @@ def main() -> None:
         """,
     )
     parser.add_argument("--run-now", action="store_true", help="즉시 파이프라인 실행")
-    parser.add_argument("--watch", action="store_true", help="감시 모드 (트리거 대기)")
+    parser.add_argument("--watch", action="store_true", help="감시 모드 (트리거 대기) + 대시보드 자동 기동")
     parser.add_argument("--interval", type=int, default=60, help="감시 간격(초, 기본: 60)")
+    parser.add_argument("--no-dashboard", action="store_true", dest="no_dashboard",
+                        help="대시보드 서버를 기동하지 않음")
+    parser.add_argument("--dashboard-port", type=int, default=8080, dest="dashboard_port",
+                        help="대시보드 서버 포트 (기본: 8080)")
     parser.add_argument("--status", action="store_true", help="현재 상태 확인 후 종료")
     parser.add_argument("--phase", type=int, choices=[1, 2, 3, 4], help="특정 Phase만 실행 (1~4)")
     parser.add_argument("--session", type=str, default="", help="세션 ID (--phase와 함께 사용)")
@@ -575,7 +638,11 @@ def main() -> None:
         ))
 
     elif args.watch:
-        watch_loop(args.interval)
+        watch_loop(
+            interval=args.interval,
+            dashboard_port=args.dashboard_port,
+            no_dashboard=args.no_dashboard,
+        )
 
     else:
         parser.print_help()
