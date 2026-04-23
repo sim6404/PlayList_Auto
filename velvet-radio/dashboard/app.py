@@ -156,19 +156,168 @@ def api_pending():
 @app.route("/api/run", methods=["POST"])
 @login_required
 def api_run():
-    """파이프라인 수동 실행 (백그라운드)"""
-    import threading
-    import asyncio
+    """파이프라인 실행 트리거 — run_queue에 트리거 파일 생성"""
+    from datetime import datetime
 
-    def run_bg():
-        asyncio.run(__import__(
-            "src.phase4_publish.scheduler", fromlist=["run_full_pipeline"]
-        ).run_full_pipeline())
+    status_file = config.data_dir / "pipeline_status.json"
+    if status_file.exists():
+        try:
+            st = json.loads(status_file.read_text(encoding="utf-8"))
+            if st.get("status") == "running":
+                return jsonify({"status": "already_running", "run_id": st.get("run_id", "")}), 409
+        except Exception:
+            pass
 
-    t = threading.Thread(target=run_bg, daemon=True)
-    t.start()
-    flash("파이프라인이 백그라운드에서 시작되었습니다", "success")
-    return redirect(url_for("index"))
+    run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + "_" + os.urandom(3).hex()
+    trigger = {
+        "run_id": run_id,
+        "source": "dashboard",
+        "requested_at": datetime.utcnow().isoformat(),
+    }
+    run_queue_dir = config.data_dir / "run_queue"
+    run_queue_dir.mkdir(parents=True, exist_ok=True)
+    trigger_path = run_queue_dir / f"trigger_{run_id}.json"
+    trigger_path.write_text(json.dumps(trigger, ensure_ascii=False), encoding="utf-8")
+
+    status_file.write_text(
+        json.dumps({"status": "triggered", "run_id": run_id,
+                    "updated_at": datetime.utcnow().isoformat()},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    logger.info("파이프라인 트리거 생성", run_id=run_id)
+    return jsonify({
+        "status": "triggered",
+        "run_id": run_id,
+        "message": "트리거 파일 생성됨. 로컬 워커(python worker.py --watch)가 자동으로 실행합니다.",
+    })
+
+
+# ── Pipeline Studio ───────────────────────────────────────────────
+
+@app.route("/pipeline-studio")
+@login_required
+def pipeline_studio():
+    """Pipeline Studio 페이지"""
+    return render_template("pipeline_studio.html")
+
+
+@app.route("/api/pipeline/status")
+@login_required
+def api_pipeline_status():
+    """파이프라인 실행 상태 반환"""
+    status_file = config.data_dir / "pipeline_status.json"
+    if status_file.exists():
+        try:
+            return jsonify(json.loads(status_file.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    return jsonify({"status": "idle", "updated_at": ""})
+
+
+@app.route("/api/sessions")
+@login_required
+def api_sessions():
+    """세션 목록 반환"""
+    session_dir = config.data_dir / "sessions"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    sessions = []
+    for f in sorted(session_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            sessions.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    return jsonify(sessions)
+
+
+@app.route("/api/session/<session_id>")
+@login_required
+def api_session(session_id: str):
+    """세션 상세 정보"""
+    path = config.data_dir / "sessions" / f"{session_id}.json"
+    if not path.exists():
+        return jsonify({"error": "세션을 찾을 수 없습니다"}), 404
+    try:
+        return jsonify(json.loads(path.read_text(encoding="utf-8")))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/session/<session_id>/log")
+@login_required
+def api_session_log(session_id: str):
+    """세션 로그 (offset 기반 스트리밍)"""
+    offset = int(request.args.get("offset", 0))
+    log_path = config.data_dir / "sessions" / f"{session_id}.log"
+    if not log_path.exists():
+        return jsonify({"lines": [], "offset": 0})
+    try:
+        content = log_path.read_text(encoding="utf-8", errors="replace")
+        lines = content.splitlines()
+        new_lines = lines[offset:]
+        return jsonify({"lines": new_lines, "offset": len(lines)})
+    except Exception as e:
+        return jsonify({"lines": [], "offset": offset, "error": str(e)})
+
+
+@app.route("/api/playlist/<playlist_id>")
+@login_required
+def api_playlist(playlist_id: str):
+    """플레이리스트 데이터"""
+    path = config.data_dir / "playlists" / f"{playlist_id}.json"
+    if not path.exists():
+        return jsonify({"error": "플레이리스트를 찾을 수 없습니다"}), 404
+    try:
+        return jsonify(json.loads(path.read_text(encoding="utf-8")))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/phase/run", methods=["POST"])
+@login_required
+def api_phase_run():
+    """특정 Phase 단독 실행 트리거 (Pipeline Studio용)"""
+    from datetime import datetime
+
+    body = request.get_json(silent=True) or {}
+    phase_num = body.get("phase")
+    session_id = body.get("session_id", "").strip()
+
+    if phase_num not in (1, 2, 3, 4):
+        return jsonify({"error": "phase는 1~4 사이 값이어야 합니다"}), 400
+    if phase_num > 1 and not session_id:
+        return jsonify({"error": "Phase 2 이상은 session_id가 필요합니다"}), 400
+
+    if not session_id:
+        session_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + f"_p{phase_num}"
+    trigger = {
+        "run_id": run_id,
+        "phase": phase_num,
+        "session_id": session_id,
+        "source": "studio",
+        "requested_at": datetime.utcnow().isoformat(),
+    }
+    run_queue_dir = config.data_dir / "run_queue"
+    run_queue_dir.mkdir(parents=True, exist_ok=True)
+    trigger_path = run_queue_dir / f"trigger_{run_id}.json"
+    trigger_path.write_text(json.dumps(trigger, ensure_ascii=False), encoding="utf-8")
+
+    status_file = config.data_dir / "pipeline_status.json"
+    status_file.write_text(
+        json.dumps({"status": "triggered", "run_id": run_id, "phase": phase_num,
+                    "session_id": session_id, "updated_at": datetime.utcnow().isoformat()},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    logger.info("Phase 트리거 생성", phase=phase_num, session_id=session_id, run_id=run_id)
+    return jsonify({
+        "status": "triggered",
+        "run_id": run_id,
+        "session_id": session_id,
+        "worker_command": f"python worker.py --phase {phase_num} --session {session_id}",
+    })
 
 
 # Telegram Webhook
