@@ -325,6 +325,22 @@
 </head>
 <body>
 
+{% if is_vercel %}
+<!-- Vercel 로컬 전용 배너 -->
+<div style="background:linear-gradient(90deg,rgba(168,85,247,0.18),rgba(79,134,247,0.18));border-bottom:1px solid rgba(168,85,247,0.35);padding:12px 24px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+  <span style="font-size:1.1rem;">🖥️</span>
+  <div style="flex:1;">
+    <span style="font-weight:600;color:#e2e8f0;">Pipeline Studio는 로컬 환경 전용입니다</span>
+    <span style="color:#94a3b8;font-size:0.82rem;margin-left:10px;">파일 시스템과 로컬 워커가 필요합니다 — Vercel에서는 실행 불가</span>
+  </div>
+  <div style="background:#111120;border-radius:8px;padding:8px 14px;font-size:0.78rem;color:#a5f3fc;white-space:nowrap;">
+    <code>python -m dashboard.app</code>
+    <span style="color:#64748b;margin:0 6px;">→</span>
+    <code style="color:#86efac;">localhost:8080/pipeline-studio</code>
+  </div>
+</div>
+{% endif %}
+
 <!-- Header -->
 <div class="header">
   <div>
@@ -508,6 +524,9 @@
 <div id="toast"></div>
 
 <script>
+// ─── Vercel 환경 감지 ─────────────────────────────────────────────
+const IS_VERCEL = {{ 'true' if is_vercel else 'false' }};
+
 // ─── State ───────────────────────────────────────────────────────
 let currentSession = null;
 let pollTimer      = null;
@@ -519,6 +538,19 @@ let lastPhaseCmd   = 'python worker.py --phase 1 --session ...';
 
 // ─── Init ────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  if (IS_VERCEL) {
+    // Vercel: 모든 실행 버튼 비활성화 + 워커 상태 표시
+    [1,2,3,4].forEach(n => {
+      const btn = document.getElementById(`btn-${n}`);
+      if (btn) { btn.disabled = true; btn.title = '로컬에서만 실행 가능'; }
+    });
+    const pill = document.getElementById('worker-pill');
+    const label = document.getElementById('worker-label');
+    if (pill && label) { label.textContent = '로컬 전용 (Vercel 비활성)'; }
+    const newBtn = document.querySelector('.btn-new');
+    if (newBtn) { newBtn.disabled = true; newBtn.title = '로컬에서만 실행 가능'; }
+    return;
+  }
   await loadSessions();
   checkWorkerStatus();
   setInterval(checkWorkerStatus, 30000);
@@ -802,6 +834,10 @@ function renderError(num, msg) {
 
 // ─── Run phase ───────────────────────────────────────────────────
 async function runPhase(num) {
+  if (IS_VERCEL) {
+    toast('Pipeline Studio는 로컬 환경에서만 실행할 수 있습니다. localhost:8080/pipeline-studio 에서 접속하세요.');
+    return;
+  }
   if (num > 1 && !currentSession?.session_id) {
     toast('먼저 Phase 1을 실행하거나 세션을 선택하세요.');
     return;

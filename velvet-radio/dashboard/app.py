@@ -44,10 +44,17 @@ from src.phase4_publish.approval_manager import ApprovalManager
 
 logger = get_logger(__name__)
 
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = config.dashboard_secret_key
 
 approval_manager = ApprovalManager()
+
+
+@app.context_processor
+def inject_globals():
+    return {"is_vercel": IS_VERCEL}
 
 
 # ── 인증 미들웨어 ──────────────────────────────────────────────────
@@ -195,6 +202,15 @@ def api_run():
 
 # ── Pipeline Studio ───────────────────────────────────────────────
 
+def _vercel_local_only():
+    """Vercel 환경에서 로컬 전용 API 호출 시 반환할 에러"""
+    return jsonify({
+        "error": "local_only",
+        "message": "Pipeline Studio는 로컬 환경에서만 사용할 수 있습니다.",
+        "hint": "로컬에서 실행: python -m dashboard.app  →  http://localhost:8080/pipeline-studio",
+    }), 503
+
+
 @app.route("/pipeline-studio")
 @login_required
 def pipeline_studio():
@@ -206,6 +222,9 @@ def pipeline_studio():
 @login_required
 def api_pipeline_status():
     """파이프라인 실행 상태 반환"""
+    if IS_VERCEL:
+        return jsonify({"status": "idle", "updated_at": "",
+                        "vercel_note": "로컬 워커 상태는 Vercel에서 조회할 수 없습니다."})
     status_file = config.data_dir / "pipeline_status.json"
     if status_file.exists():
         try:
@@ -219,6 +238,8 @@ def api_pipeline_status():
 @login_required
 def api_sessions():
     """세션 목록 반환"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     session_dir = config.data_dir / "sessions"
     session_dir.mkdir(parents=True, exist_ok=True)
     sessions = []
@@ -234,6 +255,8 @@ def api_sessions():
 @login_required
 def api_session(session_id: str):
     """세션 상세 정보"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     path = config.data_dir / "sessions" / f"{session_id}.json"
     if not path.exists():
         return jsonify({"error": "세션을 찾을 수 없습니다"}), 404
@@ -247,6 +270,8 @@ def api_session(session_id: str):
 @login_required
 def api_session_log(session_id: str):
     """세션 로그 (offset 기반 스트리밍)"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     offset = int(request.args.get("offset", 0))
     log_path = config.data_dir / "sessions" / f"{session_id}.log"
     if not log_path.exists():
@@ -264,6 +289,8 @@ def api_session_log(session_id: str):
 @login_required
 def api_playlist(playlist_id: str):
     """플레이리스트 데이터"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     path = config.data_dir / "playlists" / f"{playlist_id}.json"
     if not path.exists():
         return jsonify({"error": "플레이리스트를 찾을 수 없습니다"}), 404
@@ -277,6 +304,8 @@ def api_playlist(playlist_id: str):
 @login_required
 def api_phase_run():
     """특정 Phase 단독 실행 트리거 (Pipeline Studio용)"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     from datetime import datetime
 
     body = request.get_json(silent=True) or {}

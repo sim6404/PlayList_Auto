@@ -117,9 +117,38 @@
   <!-- 버튼 행 -->
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
     <button id="run-btn" class="btn btn-ghost" onclick="runPipeline()">▶️ 지금 실행</button>
+    {% if is_vercel %}
+    <button onclick="showLocalOnlyModal()" style="padding:8px 16px;border-radius:8px;font-size:0.85rem;font-weight:600;background:linear-gradient(135deg,#a855f7,#6366f1);color:#fff;border:none;cursor:pointer;transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">🎛️ Pipeline Studio</button>
+    {% else %}
     <a href="/pipeline-studio" style="padding:8px 16px;border-radius:8px;font-size:0.85rem;font-weight:600;background:linear-gradient(135deg,#a855f7,#6366f1);color:#fff;text-decoration:none;border:none;cursor:pointer;transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">🎛️ Pipeline Studio</a>
+    {% endif %}
     <button class="btn btn-ghost" style="font-size:0.82rem;" onclick="refreshStatus(true)">🔄 상태 새로고침</button>
   </div>
+
+  {% if is_vercel %}
+  <!-- Vercel 로컬 전용 안내 모달 -->
+  <div id="local-only-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#0d0d1a;border:1px solid rgba(168,85,247,0.4);border-radius:14px;padding:32px 28px;max-width:500px;width:90%;box-shadow:0 0 40px rgba(168,85,247,0.15);">
+      <div style="font-size:2rem;margin-bottom:12px;">🖥️</div>
+      <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:10px;background:linear-gradient(135deg,#a855f7,#4f86f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Pipeline Studio — 로컬 전용</h3>
+      <p style="font-size:0.875rem;color:#94a3b8;line-height:1.7;margin-bottom:20px;">
+        Pipeline Studio는 파일 시스템과 로컬 워커를 직접 사용하므로<br>
+        <b style="color:#e2e8f0;">이 Vercel 서버에서는 실행할 수 없습니다.</b>
+      </p>
+      <div style="background:#111120;border-radius:8px;padding:14px 16px;margin-bottom:20px;font-size:0.82rem;">
+        <div style="color:#64748b;margin-bottom:8px;">로컬에서 실행하는 방법:</div>
+        <code style="color:#a5f3fc;display:block;margin-bottom:4px;">cd velvet-radio</code>
+        <code style="color:#a5f3fc;display:block;margin-bottom:4px;">python -m dashboard.app</code>
+        <code style="color:#a5f3fc;display:block;margin-bottom-4px;">python worker.py --watch</code>
+        <div style="color:#64748b;margin-top:10px;">그 다음 브라우저에서:</div>
+        <code style="color:#86efac;">http://localhost:8080/pipeline-studio</code>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('local-only-modal').style.display='none'" style="padding:8px 18px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;cursor:pointer;font-size:0.85rem;">닫기</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- 워커 실행 안내 -->
   <div style="margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
@@ -276,5 +305,10 @@ function stopPolling() {
 
 // ── 초기화 ────────────────────────────────────────────────────────
 refreshStatus();
+
+function showLocalOnlyModal() {
+  const m = document.getElementById('local-only-modal');
+  if (m) { m.style.display = 'flex'; }
+}
 </script>
 {% endblock %}
