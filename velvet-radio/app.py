@@ -50,6 +50,20 @@ MASTER_PASSWORD = os.environ.get("MASTER_PASSWORD", "velvet2024")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 N8N_WEBHOOK_BASE_URL = os.environ.get("N8N_WEBHOOK_BASE_URL", "")
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+
+@app.context_processor
+def inject_globals():
+    return {"is_vercel": IS_VERCEL}
+
+
+def _vercel_local_only():
+    return jsonify({
+        "error": "local_only",
+        "message": "Pipeline Studio는 로컬 환경에서만 사용할 수 있습니다.",
+        "hint": "로컬 실행: python -m dashboard.app  →  http://localhost:8080/pipeline-studio",
+    }), 503
 
 
 # ── 인증 ─────────────────────────────────────────────────────────
@@ -556,6 +570,8 @@ def pipeline_studio():
 @app.route("/api/sessions")
 @login_required
 def api_sessions():
+    if IS_VERCEL:
+        return _vercel_local_only()
     sessions = _list_sessions()
     # 각 세션에서 핵심 정보만 반환
     summary = []
@@ -579,6 +595,8 @@ def api_sessions():
 @app.route("/api/session/<session_id>")
 @login_required
 def api_session_detail(session_id: str):
+    if IS_VERCEL:
+        return _vercel_local_only()
     data = _load_session_file(session_id)
     if data is None:
         return jsonify({"error": "not found"}), 404
@@ -593,6 +611,8 @@ def api_session_detail(session_id: str):
 @login_required
 def api_phase_run():
     """특정 Phase 단독 실행 트리거"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     body = request.get_json(silent=True) or {}
     phase = body.get("phase")
     session_id = body.get("session_id") or ""
@@ -640,6 +660,8 @@ def api_phase_run():
 @login_required
 def api_session_log(session_id: str):
     """세션 활동 로그 파일 반환 (data/sessions/<id>.log)"""
+    if IS_VERCEL:
+        return _vercel_local_only()
     log_path = SESSION_DIR / f"{session_id}.log"
     if not log_path.exists():
         return jsonify({"lines": [], "total": 0})
@@ -654,6 +676,8 @@ def api_session_log(session_id: str):
 @app.route("/api/playlist/<playlist_id>")
 @login_required
 def api_playlist_detail(playlist_id: str):
+    if IS_VERCEL:
+        return _vercel_local_only()
     path = PLAYLISTS_DIR / f"{playlist_id}.json"
     if not path.exists():
         return jsonify({"error": "not found"}), 404
