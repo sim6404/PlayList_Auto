@@ -86,7 +86,7 @@
     <label style="color:var(--text-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.06em;">트랙별 품질 점수</label>
     {% for asset in data.quality_report.assets[:10] %}
     <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-      <span style="color:var(--text-muted);font-size:0.8rem;min-width:60px;">T{{asset.track_order:02d}}</span>
+      <span style="color:var(--text-muted);font-size:0.8rem;min-width:60px;">T{{ "%02d" % asset.track_order }}</span>
       <div style="flex:1;">
         <div class="quality-bar">
           <div class="quality-fill" style="width:{{ (asset.quality_score * 100)|int }}%;"></div>
