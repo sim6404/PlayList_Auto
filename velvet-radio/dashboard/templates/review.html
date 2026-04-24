@@ -100,14 +100,34 @@
   {% endif %}
 </div>
 
-<!-- 영상 정보 -->
-<div class="card">
-  <h3 style="color:var(--accent);margin-bottom:16px;">📹 영상 정보</h3>
-  <div class="meta-item">
-    <label>영상 파일</label>
-    <div class="value" style="font-size:0.85rem;word-break:break-all;">{{ data.video_path }}</div>
+<!-- 영상 플레이어 -->
+{% if data.video_path %}
+{% set _vrel = data.video_path | replace('data\\', '') | replace('data/', '') | replace('\\', '/') %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <div style="background:#000;position:relative;">
+    <video
+      controls
+      preload="metadata"
+      style="width:100%;max-height:480px;display:block;"
+      poster="/media/{{ data.thumbnail_path | replace('data\\','') | replace('data/','') | replace('\\','/') }}"
+    >
+      <source src="/media/{{ _vrel }}" type="video/mp4">
+      <p style="padding:20px;color:#aaa;">브라우저가 video 태그를 지원하지 않습니다.</p>
+    </video>
+  </div>
+  <div style="padding:14px 20px;display:flex;align-items:center;gap:16px;background:var(--bg2);border-top:1px solid var(--border);">
+    <span style="font-size:0.8rem;color:var(--text-muted);">📹 영상 정보</span>
+    {% if data.duration_seconds %}
+    <span style="font-size:0.85rem;color:var(--text);">⏱ {{ (data.duration_seconds // 60) }}분 {{ (data.duration_seconds % 60) }}초</span>
+    {% endif %}
+    <span style="font-size:0.75rem;color:var(--text-muted);word-break:break-all;margin-left:auto;">{{ data.video_path }}</span>
+    <a href="/media/{{ _vrel }}" download
+       style="padding:6px 12px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:0.8rem;text-decoration:none;white-space:nowrap;">
+      ⬇ 다운로드
+    </a>
   </div>
 </div>
+{% endif %}
 
 <!-- 마스터 피드백 입력 -->
 {% if data.status == 'pending' %}
