@@ -45,6 +45,8 @@ for d in [PENDING_DIR, APPROVED_DIR, RUN_QUEUE_DIR, SUNO_CALLBACKS_DIR, SESSION_
 # ── Flask 앱 ──────────────────────────────────────────────────────
 app = Flask(__name__, template_folder=str(TEMPLATE_DIR), static_folder=str(STATIC_DIR))
 app.secret_key = os.environ.get("DASHBOARD_SECRET_KEY", "velvet-radio-dev-secret")
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 
 MASTER_PASSWORD = os.environ.get("MASTER_PASSWORD", "velvet2024")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -241,9 +243,17 @@ def api_approve(playlist_id: str):
     data = _load_request(playlist_id)
     if data is None:
         return jsonify({"status": "error", "message": "not found"}), 404
+    body = request.json or {}
     data["status"] = "approved"
     data["approved_at"] = datetime.utcnow().isoformat()
-    data["feedback"] = request.json.get("feedback", "") if request.is_json else ""
+    data["master_feedback"] = body.get("feedback", "")
+    # 관리자가 선택한 배경 이미지 인덱스 (0-based)
+    selected_idx = int(body.get("selected_background_index", 0))
+    data["selected_background_index"] = selected_idx
+    # 선택된 배경 경로 기록
+    samples = data.get("background_samples", [])
+    if samples and selected_idx < len(samples):
+        data["selected_background_path"] = samples[selected_idx]
     pending_path = PENDING_DIR / f"{playlist_id}.json"
     if pending_path.exists():
         pending_path.unlink()

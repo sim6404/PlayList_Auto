@@ -462,22 +462,33 @@ async def run_phase3_only(session_id: str) -> dict:
     _slog(session_id, "Phase 3 시작 — 이미지 생성 + 영상 렌더링 중...")
 
     try:
-        _slog(session_id, "이미지 생성 중 (배경 + 썸네일)...")
+        _slog(session_id, "이미지 생성 중 (썸네일 + 배경 5종 샘플 — 나노바나나2 API)...")
         img_client = ImageGeneratorClient()
         images = img_client.generate_for_playlist(playlist)
+        background_samples = images.get("background_samples", [images["background"]])
+        _slog(session_id, f"이미지 생성 완료 — 배경 샘플 {len(background_samples)}종")
 
         srt_map = generate_srt_for_playlist(
             playlist.id,
-            [{"order": a.track_order, "duration_seconds": a.duration_seconds}
-             for a in quality_report.assets],
+            [
+                {
+                    "order": a.track_order,
+                    "duration_seconds": a.duration_seconds,
+                    "bpm": getattr(a, "bpm", 90),
+                }
+                for a in quality_report.assets
+            ],
         )
+
+        # 기본 배경 = sample_1 (관리자가 승인 단계에서 변경 가능)
+        default_background = str(background_samples[0]) if background_samples else str(images["background"])
 
         track_assets = [
             {
                 "order": a.track_order,
                 "title": a.title,
                 "audio_path": a.file_path,
-                "background_path": str(images["background"]),
+                "background_path": default_background,
                 "subtitle_path": str(srt_map.get(a.track_order, "")),
             }
             for a in quality_report.assets if a.selected
@@ -500,7 +511,8 @@ async def run_phase3_only(session_id: str) -> dict:
             playlist=playlist,
             track_videos=valid_videos,
             thumbnail_path=images["thumbnail"],
-            background_path=images["background"],
+            background_path=Path(default_background),
+            background_samples=[str(s) for s in background_samples],
         )
 
         duration = (datetime.utcnow() - t0).total_seconds()
@@ -513,7 +525,11 @@ async def run_phase3_only(session_id: str) -> dict:
             "video_duration": video_asset.duration_seconds,
             "thumbnail_path": video_asset.thumbnail_path,
             "final_video_path": video_asset.final_video_path,
-            "summary": f"영상: {len(valid_videos)}트랙 합본, {video_asset.duration_seconds // 60}분",
+            "background_samples": [str(s) for s in background_samples],
+            "summary": (
+                f"영상: {len(valid_videos)}트랙 합본, {video_asset.duration_seconds // 60}분, "
+                f"배경 샘플 {len(background_samples)}종"
+            ),
             "video_asset_json": video_asset.model_dump_json(),
         }
         session["current_phase"] = 4

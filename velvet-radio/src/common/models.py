@@ -170,6 +170,7 @@ class VideoAsset(BaseModel):
     playlist_id: str
     thumbnail_path: str
     background_path: str
+    background_samples: list[str] = Field(default_factory=list)  # 5종 샘플 경로
     spectrum_video_path: str
     subtitle_path: str
     final_video_path: str
@@ -214,6 +215,8 @@ class ApprovalRequest(BaseModel):
     playlist_id: str
     video_path: str
     thumbnail_path: str
+    background_samples: list[str] = Field(default_factory=list)   # 5종 배경 샘플 경로
+    selected_background_index: int = 0                             # 관리자 선택 (0=sample_1)
     preview_url: Optional[str] = None
     seo: SEOMetadata
     quality_report: QualityReport

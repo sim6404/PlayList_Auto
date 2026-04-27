@@ -56,7 +56,7 @@ class ApprovalManager:
         """
         마스터 승인 요청 제출
 
-        1. ApprovalRequest 생성 + 파일 저장
+        1. ApprovalRequest 생성 + 파일 저장 (배경 샘플 5종 포함)
         2. Telegram 알림 발송 (썸네일 + 버튼)
         3. 승인 대기 시작
 
@@ -67,6 +67,8 @@ class ApprovalManager:
             playlist_id=playlist_id,
             video_path=video_asset.final_video_path,
             thumbnail_path=video_asset.thumbnail_path,
+            background_samples=video_asset.background_samples,
+            selected_background_index=0,  # 기본: sample_1
             seo=seo,
             quality_report=quality_report,
             status=ApprovalStatus.PENDING,

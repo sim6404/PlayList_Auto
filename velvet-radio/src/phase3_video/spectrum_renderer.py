@@ -19,16 +19,17 @@ VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 # ── FFmpeg 필터 프리셋 ───────────────────────────────────────────
 
 SPECTRUM_FILTERS = {
-    "wave": (
-        "[1:a]showwaves=s=1920x200:mode=cline:rate=30:"
-        "colors=0xFFFFFF@0.7:scale=sqrt,format=rgba[wave];"
-        "[bg][wave]overlay=0:H-220:shortest=1[vout]"
+    # 클린 배경 — 파형 없이 순수 배경 이미지만 (기본값)
+    "clean": (
+        "[bg]null[vout]"
     ),
+    # 주파수 막대 (선택적 사용)
     "freq": (
         "[1:a]showfreqs=s=1920x200:mode=bar:ascale=log:"
         "colors=0xE8D5B7@0.8,format=rgba[freq];"
         "[bg][freq]overlay=0:H-220:shortest=1[vout]"
     ),
+    # 벡터스코프 (코너 소형)
     "vector": (
         "[1:a]avectorscope=s=400x400:zoom=1.5:draw=line:"
         "bc=0x000000:fc=0xFFFFFF@0.6,format=rgba[scope];"
@@ -121,7 +122,7 @@ def render_track_video(
     audio_file: Path,
     output_path: Path,
     subtitle_file: Path | None = None,
-    filter_type: str = "wave",
+    filter_type: str = "clean",
 ) -> Path:
     """
     단일 트랙 영상 렌더링.
@@ -167,7 +168,7 @@ def render_track_video(
 def render_playlist_videos(
     playlist_id: str,
     track_assets: list[dict],  # [{order, title, audio_path, background_path, subtitle_path}]
-    filter_type: str = "wave",
+    filter_type: str = "clean",
 ) -> list[dict]:
     """
     플레이리스트 전체 곡별 영상 렌더링

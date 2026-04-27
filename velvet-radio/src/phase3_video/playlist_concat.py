@@ -100,6 +100,7 @@ def concat_playlist_videos(
     track_videos: list[dict],   # [{order, title, video_path}]
     thumbnail_path: Path,
     background_path: Path,
+    background_samples: list[str] | None = None,
 ) -> VideoAsset:
     """
     플레이리스트 최종 영상 합본
@@ -187,7 +188,8 @@ def concat_playlist_videos(
         playlist_id=playlist.id,
         thumbnail_path=str(thumbnail_path),
         background_path=str(background_path),
-        spectrum_video_path="",   # 개별 트랙 영상들
+        background_samples=[str(s) for s in (background_samples or [])],
+        spectrum_video_path="",
         subtitle_path=srt_ref,
         final_video_path=str(final_path),
         duration_seconds=int(total_duration),
